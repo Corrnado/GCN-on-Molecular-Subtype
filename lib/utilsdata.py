@@ -21,6 +21,13 @@ import os
 from sklearn import preprocessing
 from sklearn import linear_model
 
+
+def accuracy(output, labels): # average of each batch 
+    preds = output.max(1)[1].type_as(labels)
+    correct = preds.eq(labels).double()
+    correct = correct.sum()
+    return correct / len(labels)
+
 def encode_onehot(labels):
     classes = set(labels)
     classes_dict = {c: np.identity(len(classes))[i, :] for i, c in
@@ -28,6 +35,15 @@ def encode_onehot(labels):
     labels_onehot = np.array(list(map(classes_dict.get, labels)),
                              dtype=np.int32)
     return labels_onehot
+
+def sparse_mx_to_torch_sparse_tensor(sparse_mx):
+    """Convert a scipy sparse matrix to a torch sparse tensor."""
+    sparse_mx = sparse_mx.tocoo().astype(np.float32)
+    indices = torch.from_numpy(
+        np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64))
+    values = torch.from_numpy(sparse_mx.data)
+    shape = torch.Size(sparse_mx.shape)
+    return torch.sparse.FloatTensor(indices, values, shape)#.requires_grad_()
 
 def high_variance_expression_gene(expression_variance_path, non_null_path, num_gene, singleton=False):
     gene_variance = pd.read_csv(expression_variance_path, sep='\t', index_col=0, header=0)
@@ -57,6 +73,12 @@ def load_multiomics_data(expression_data_path, cnv_data_path):
     expression_data = pd.read_csv(expression_data_path, sep='\t', index_col=0, header=0)
     cnv_data = pd.read_csv(cnv_data_path, sep='\t', index_col=0, header=0)
     return expression_data, cnv_data
+
+def load_mrna_and_mirna_data(expression_data_path, mirna_data_path):
+    ## load multi-omics data
+    expression_data = pd.read_csv(expression_data_path, sep='\t', index_col=0, header=0)
+    mirna_data = pd.read_csv(mirna_data_path, sep='\t', index_col=0, header=0)
+    return expression_data, mirna_data
 
 def downSampling_singleomics_data(expression_variance_path, expression_data, non_null_index_path, shuffle_index_path, adjacency_matrix_path, number_gene, singleton=False):
     ## obtain high varaince gene list
@@ -104,10 +126,13 @@ def downSampling_multiomics_data(expression_variance_path, expression_data, cnv_
     ## filter multi-omics data by gene list
     expression_data = expression_data.loc[:,high_variance_gene_list]
     cnv_data = cnv_data.loc[:,high_variance_gene_list]
+    print(cnv_data.shape)
     num_samples = cnv_data.shape[0]
     ## concatenate expr and cnv
     data= np.asarray(cnv_data).reshape(num_samples, -1 ,1)
+    print(data.shape)
     data = np.concatenate([data, np.asarray(expression_data).reshape(num_samples, -1, 1) ], axis = 2)
+    print(data.shape)
 
     ## load adjacency matrix
     adj = sp.load_npz(adjacency_matrix_path)
@@ -129,6 +154,54 @@ def downSampling_multiomics_data(expression_variance_path, expression_data, cnv_
     
     return adj_selected, np.asarray(data), labels.to_numpy(), shuffle_index.to_numpy()
 
+def downSampling_mrna_and_mirna_data(expression_variance_path, expression_data, mirna_data, non_null_index_path, shuffle_index_path, adjacency_matrix_path, number_gene, singleton=False):
+    ## obtain high varaince gene list
+    high_variance_gene_list, high_variance_gene_index = high_variance_expression_gene(expression_variance_path, non_null_index_path, number_gene, singleton)
+
+    ## get labels before filtering columns
+    labels = expression_data['icluster_cluster_assignment']
+    labels = labels - 1
+    
+    ## filter multi-omics data by gene list
+    expression_data = expression_data.loc[:,high_variance_gene_list]
+    # mirna_data = mirna_data.loc[:,high_variance_gene_list]
+    num_samples = mirna_data.shape[0]
+
+    ## pad zero columns to mirna, mirna only has dimension of 743
+    difference_in_dimension = expression_data.shape[1] - mirna_data.shape[1]
+    for ind in range(difference_in_dimension):
+        mirna_data[ind] = 0
+    # print(mirna_data.shape)
+    
+    ## concatenate expr and mirna
+    data = np.asarray(mirna_data).reshape(num_samples, -1 ,1)
+    # print(data.shape)
+    data = np.concatenate([data, np.asarray(expression_data).reshape(num_samples, -1, 1) ], axis = 2)
+    # print(data.shape)
+
+    ## load adjacency matrix
+    adj = sp.load_npz(adjacency_matrix_path)
+    adj_mat = adj.todense()
+    adj_mat_selected = adj_mat[high_variance_gene_index,:]
+    adj_mat_selected = adj_mat_selected[:,high_variance_gene_index]
+    # print(adj_mat_selected.shape)
+
+    ## convert the dense matrix back to sparse matrix
+    adj_selected = sp.csr_matrix(adj_mat_selected)
+
+    if singleton:
+        print('including singleton')
+        adj_selected = adj_selected + sp.eye(adj_selected.shape[0])
+
+    # del features['iCluster']
+    shuffle_index = pd.read_csv(shuffle_index_path, sep='\t', index_col=0, header=0)
+    # print(shuffle_index.shape)
+    
+    return adj_selected, np.asarray(data), labels.to_numpy(), shuffle_index.to_numpy()
+
+
+       
+        
 
        
         

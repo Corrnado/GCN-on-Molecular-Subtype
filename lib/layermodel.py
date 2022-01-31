@@ -137,7 +137,9 @@ class Graph_GCN(nn.Module):
         Fin = FC1_F + FC1_F; Fout = self.out_dim;
         self.FC_sum1 = nn.Linear(Fin, Fout)             
         # NN_FC1
-        self.nn_fc1 = nn.Linear(self.D_g*F_0, NN_FC1)
+        # self.nn_fc1 = nn.Linear(self.D_g*F_0, NN_FC1)
+        ## mirna only has 743 input
+        self.nn_fc1 = nn.Linear(743, NN_FC1)
         # NN_FC2
         self.nn_fc2 = nn.Linear(NN_FC1, NN_FC2)
         # NN_FC3_decode
@@ -224,8 +226,18 @@ class Graph_GCN(nn.Module):
 
     def forward(self, x_in, d, L):
         
-        x = x_in#[:,:self.num_gene]
-        x_nn = x_in.view(x_in.size()[0], -1) #[:,self.num_gene:]
+        # x = x_in#[:,:self.num_gene]
+        # x_nn = x_in.view(x_in.size()[0], -1) #[:,self.num_gene:]
+        # print(x.shape)
+        # print(x_nn.shape)
+
+        ## modify to use first layer (expression) of x for GCN and second layer (mirna) of x for FC, #mirna = 743
+        x = x_in[:,:,0]#[:,:self.num_gene]
+        ## convert x back to a 3D tensor
+        x = x.unsqueeze(-1)
+        # print(x.shape)
+        x_nn = x_in[:,:743,1] #[:,number of mirna:]
+        # print(x_nn.shape)
 
         #x = x.unsqueeze(2) # B x V x Fin=1
         x = self.graph_conv_cheby(x, self.cl1, L[0], self.CL1_F, self.CL1_K)

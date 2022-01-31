@@ -62,7 +62,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--user', type=str, default='personal', help="personal or hpc")
 parser.add_argument('--lr', type=float, default = 0.01, help='learning rate.')
 parser.add_argument('--num_gene', type=int, default = 1000, help='# of genes')
-parser.add_argument('--num_omic', type=int, default = 1, help='# of omics')
+parser.add_argument('--num_omic', type=int, default = 2, help='# of omics')
+parser.add_argument('--use_mirna', type=bool, default = False, help='use mirna data')
 parser.add_argument('--epochs', type=int, default = 30, help='# of epoch')
 parser.add_argument('--batchsize', type=int, default = 64, help='# of genes')
 parser.add_argument('--database', type=str, default='biogrid', choices=['biogrid', 'string', 'coexpression'],help="netWork")
@@ -81,10 +82,11 @@ generateTrainTest = 1
     
 print('load data...')
 
-expression_data_path = 'data/common_expression_data.tsv'
+expression_data_path = 'data/common_expression_data_mi.tsv'
 cnv_data_path = 'data/common_cnv_data.tsv'
+mirna_data_path = 'data/common_mirna_data_mi.tsv'
 expression_variance_file = 'data/expression_variance.tsv'
-shuffle_index_path = 'data/common_shuffle_index.tsv'
+shuffle_index_path = 'data/common_trimmed_shuffle_index.tsv'
 if args.database == 'biogrid':
     adjacency_matrix_file = 'data/adj_matrix_biogrid.npz'
     non_null_index_path = 'data/biogrid_non_null.csv'
@@ -96,27 +98,39 @@ elif args.database == 'coexpression':
     non_null_index_path = 'data/coexpression_non_null.csv'
 
 if args.loaddata:
-    if args.num_omic == 1:
-        expr_all_data = load_singleomic_data(expression_data_path)
+    if args.use_mirna:
+        expr_all_data, mirna_all_data = load_mrna_and_mirna_data(expression_data_path, mirna_data_path)
 
-        adj, train_data_all, labels, shuffle_index = utilsdata.downSampling_singleomics_data(expression_variance_path=expression_variance_file,
-                                                                            expression_data=expr_all_data,
-                                                                            non_null_index_path=non_null_index_path,
-                                                                            shuffle_index_path=shuffle_index_path,
-                                                                            adjacency_matrix_path=adjacency_matrix_file,
-                                                                            number_gene=args.num_gene,
-                                                                            singleton=args.singleton)
-    elif atgs.num_omic == 2:
-        expr_all_data, cnv_all_data = load_multiomics_data(expression_data_path, cnv_data_path)
+        adj, train_data_all, labels, shuffle_index = utilsdata.downSampling_mrna_and_mirna_data(expression_variance_path=expression_variance_file,
+                                                                        expression_data=expr_all_data,
+                                                                        mirna_data=mirna_all_data,
+                                                                        non_null_index_path=non_null_index_path,
+                                                                        shuffle_index_path=shuffle_index_path,
+                                                                        adjacency_matrix_path=adjacency_matrix_file,
+                                                                        number_gene=args.num_gene,
+                                                                        singleton=args.singleton)
+    else:
+        if args.num_omic == 1:
+            expr_all_data = load_singleomic_data(expression_data_path)
 
-        adj, train_data_all, labels, shuffle_index = utilsdata.downSampling_multiomics_data(expression_variance_path=expression_variance_file,
-                                                                      expression_data=expr_all_data,
-                                                                      cnv_data=cnv_all_data,
-                                                                      non_null_index_path=non_null_index_path,
-                                                                      shuffle_index_path=shuffle_index_path,
-                                                                      adjacency_matrix_path=adjacency_matrix_file,
-                                                                      number_gene=args.num_gene,
-                                                                      singleton=False)
+            adj, train_data_all, labels, shuffle_index = utilsdata.downSampling_singleomics_data(expression_variance_path=expression_variance_file,
+                                                                                expression_data=expr_all_data,
+                                                                                non_null_index_path=non_null_index_path,
+                                                                                shuffle_index_path=shuffle_index_path,
+                                                                                adjacency_matrix_path=adjacency_matrix_file,
+                                                                                number_gene=args.num_gene,
+                                                                                singleton=args.singleton)
+        elif args.num_omic == 2:
+            expr_all_data, cnv_all_data = load_multiomics_data(expression_data_path, cnv_data_path)
+
+            adj, train_data_all, labels, shuffle_index = utilsdata.downSampling_multiomics_data(expression_variance_path=expression_variance_file,
+                                                                        expression_data=expr_all_data,
+                                                                        cnv_data=cnv_all_data,
+                                                                        non_null_index_path=non_null_index_path,
+                                                                        shuffle_index_path=shuffle_index_path,
+                                                                        adjacency_matrix_path=adjacency_matrix_file,
+                                                                        number_gene=args.num_gene,
+                                                                        singleton=args.singleton)
 
 from sklearn import preprocessing
 le = preprocessing.LabelEncoder()
@@ -181,7 +195,7 @@ except NameError:
 
 
 # network parameters
-F_0 = 2
+F_0 = 1
 D_g = train_data.shape[1] # features(genes)
 CL1_F = 5
 CL1_K = 5
