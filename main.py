@@ -287,8 +287,8 @@ for epoch in range(num_epochs):  # loop over the dataset multiple times
         out_gae, out_hidden, output, out_adj = net(batch_x, dropout_value, L)
         
         # print(batch_x.size())
-        print(batch_x[0,:,1])
-        print(batch_x[0,:,0])
+        # print(batch_x[0,:,1])
+        # print(batch_x[0,:,])
         batch_x = batch_x[:,:,1]
         loss_batch = net.loss(out_gae, batch_x, output, batch_y, l2_regularization)
         acc_batch = utilsdata.accuracy(output, batch_y).item()
