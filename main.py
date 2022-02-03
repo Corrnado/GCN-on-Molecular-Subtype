@@ -174,11 +174,13 @@ L = [laplacian(adj, normalized=True)]
 train_labels = train_labels.astype(np.int64)
 test_labels = test_labels.astype(np.int64)
 train_data = torch.FloatTensor(train_data)
+# print(train_data.shape) ## still [tran_size,num_gene,2] here
 train_labels = torch.LongTensor(train_labels)
 test_data = torch.FloatTensor(test_data)
 test_labels = torch.LongTensor(test_labels)
 
 dset_train = Data.TensorDataset(train_data, train_labels)
+# print(len(dset_train))
 train_loader = Data.DataLoader(dset_train, batch_size = args.batchsize, shuffle = True)
 dset_test = Data.TensorDataset(test_data, test_labels)
 test_loader = Data.DataLoader(dset_test, shuffle = False)
@@ -205,7 +207,7 @@ NN_FC1 = 256
 NN_FC2 = 32
 out_dim = nclass
 
-net_parameters = [F_0,D_g, CL1_F, CL1_K, FC1_F,FC2_F,NN_FC1, NN_FC2, out_dim]
+net_parameters = [F_0, D_g, CL1_F, CL1_K, FC1_F, FC2_F, NN_FC1, NN_FC2, out_dim]
 def weight_init(m):
     if isinstance(m, torch.nn.Conv2d) or isinstance(m, torch.nn.Linear):
         torch.nn.init.xavier_uniform_(m.weight)
@@ -280,10 +282,14 @@ for epoch in range(num_epochs):  # loop over the dataset multiple times
     # confusion_matrix = torch.zeros(nclass, nclass)
     for i, (batch_x, batch_y) in enumerate(train_loader):
         batch_x, batch_y = batch_x.to(device), batch_y.to(device)
-                
+            
         optimizer.zero_grad()
         out_gae, out_hidden, output, out_adj = net(batch_x, dropout_value, L)
         
+        # print(batch_x.size())
+        print(batch_x[0,:,1])
+        print(batch_x[0,:,0])
+        batch_x = batch_x[:,:,1]
         loss_batch = net.loss(out_gae, batch_x, output, batch_y, l2_regularization)
         acc_batch = utilsdata.accuracy(output, batch_y).item()
         

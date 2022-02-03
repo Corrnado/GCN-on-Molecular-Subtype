@@ -231,12 +231,12 @@ class Graph_GCN(nn.Module):
         # print(x.shape)
         # print(x_nn.shape)
 
-        ## modify to use first layer (expression) of x for GCN and second layer (mirna) of x for FC, #mirna = 743
-        x = x_in[:,:,0]#[:,:self.num_gene]
+        ## modify to use second layer (expression) of x for GCN and first layer (mirna) of x for FC, #mirna = 743
+        x = x_in[:,:,1]#[:,:self.num_gene]
         ## convert x back to a 3D tensor
         x = x.unsqueeze(-1)
         # print(x.shape)
-        x_nn = x_in[:,:743,1] #[:,number of mirna:]
+        x_nn = x_in[:,:743,0] #[:,number of mirna:]
         # print(x_nn.shape)
 
         #x = x.unsqueeze(2) # B x V x Fin=1
@@ -291,9 +291,10 @@ class Graph_GCN(nn.Module):
         return x_decode_gae, x_hidden_gae, x, x_reAdj
 
 
-    def loss(self, y1, y_target1,y2, y_target2,l2_regularization):
+    def loss(self, y1, y_target1, y2, y_target2,l2_regularization):
         y_target1 = y_target1.view(y_target1.size()[0], -1)
         
+        # print(y1.shape, y_target1.shape)
         loss1 = nn.MSELoss()(y1, y_target1)
         loss2 = nn.CrossEntropyLoss()(y2, y_target2)           
         loss = 1 * loss1 + 1 * loss2 
