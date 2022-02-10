@@ -201,10 +201,10 @@ F_0 = 1
 D_g = train_data.shape[1] # features(genes)
 CL1_F = 5
 CL1_K = 5
-FC1_F = 32
+FC1_F = 64
 FC2_F = 0
 NN_FC1 = 256
-NN_FC2 = 32
+NN_FC2 = 64
 out_dim = nclass
 
 net_parameters = [F_0, D_g, CL1_F, CL1_K, FC1_F, FC2_F, NN_FC1, NN_FC2, out_dim]
@@ -287,8 +287,8 @@ for epoch in range(num_epochs):  # loop over the dataset multiple times
         out_gae, out_hidden, output, out_adj = net(batch_x, dropout_value, L)
         
         # print(batch_x.size())
-        print(batch_x[0,:,1])
-        print(batch_x[0,:,0])
+        # print(batch_x[0,:,1])
+        # print(batch_x[0,:,0])
         batch_x = batch_x[:,:,1]
         loss_batch = net.loss(out_gae, batch_x, output, batch_y, l2_regularization)
         acc_batch = utilsdata.accuracy(output, batch_y).item()
