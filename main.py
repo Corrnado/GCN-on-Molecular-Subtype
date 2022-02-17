@@ -205,9 +205,10 @@ FC1_F = 64
 FC2_F = 0
 NN_FC1 = 256
 NN_FC2 = 64
+NN_IM = 32
 out_dim = nclass
 
-net_parameters = [F_0, D_g, CL1_F, CL1_K, FC1_F, FC2_F, NN_FC1, NN_FC2, out_dim]
+net_parameters = [F_0, D_g, CL1_F, CL1_K, FC1_F, FC2_F, NN_FC1, NN_FC2, NN_IM, out_dim]
 def weight_init(m):
     if isinstance(m, torch.nn.Conv2d) or isinstance(m, torch.nn.Linear):
         torch.nn.init.xavier_uniform_(m.weight)
@@ -284,13 +285,13 @@ for epoch in range(num_epochs):  # loop over the dataset multiple times
         batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             
         optimizer.zero_grad()
-        out_gae, out_hidden, output, out_adj = net(batch_x, dropout_value, L)
+        out_gae, out_hidden, output, out_nn, graph_pred, fc_pred = net(batch_x, dropout_value, L)
         
         # print(batch_x.size())
         # print(batch_x[0,:,1])
         # print(batch_x[0,:,0])
         batch_x = batch_x[:,:,1]
-        loss_batch = net.loss(out_gae, batch_x, output, batch_y, l2_regularization)
+        loss_batch = net.loss(out_gae, batch_x, output, batch_y, l2_regularization, out_hidden, out_nn, graph_pred, fc_pred)
         acc_batch = utilsdata.accuracy(output, batch_y).item()
         
         loss_batch.backward()

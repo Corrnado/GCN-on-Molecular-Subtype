@@ -84,7 +84,7 @@ class Graph_GCN(nn.Module):
         ## NN_FC1: the parallel network FC 1
         ## NN_FC2: the parallel network FC 2
         ## FC1_F: fully connected layer 1
-        F_0, D_g, CL1_F, CL1_K, FC1_F, FC2_F, NN_FC1, NN_FC2, out_dim = net_parameters
+        F_0, D_g, CL1_F, CL1_K, FC1_F, FC2_F, NN_FC1, NN_FC2, NN_IM, out_dim = net_parameters
         CNN1_F, CNN1_K = 32, 5
         CL2_F, CL2_K = 10, 10
         D_nn = D_g
@@ -142,11 +142,12 @@ class Graph_GCN(nn.Module):
         self.nn_fc1 = nn.Linear(743, NN_FC1)
         # NN_FC2
         self.nn_fc2 = nn.Linear(NN_FC1, NN_FC2)
-        # NN_FC3_decode
-        self.nn_fc3 = nn.Linear(NN_FC2, NN_FC1)
-        # NN_FC4_decode
-        Fin = NN_FC2; Fout = self.D_g*F_0;
-        self.nn_fc4 = nn.Linear(Fin, Fout)        
+
+        # for inter-modal prediction
+        # NN_im1
+        self.nn_im1 = nn.Linear(NN_FC2, NN_IM)
+        # NN_im2
+        self.nn_im2 = nn.Linear(NN_IM, Fout)        
 
         
         # nb of parameters
@@ -253,7 +254,7 @@ class Graph_GCN(nn.Module):
         ##############################################
         ##                  GAE_re                  ##
         ##############################################
-        x_reAdj = 0 #torch.stack([F.sigmoid(torch.mm(z_i, z_i.t())) for z_i in x_reAdj])
+        # x_reAdj = 0 #torch.stack([F.sigmoid(torch.mm(z_i, z_i.t())) for z_i in x_reAdj])
         
         ##############################################
         ##                  GAE                     ##
@@ -284,14 +285,44 @@ class Graph_GCN(nn.Module):
 
         # concatenate layer 
 
-        x = torch.cat((x_hidden_gae, x_nn),1)        
-        x = self.FC_sum2(x)
-        x = F.log_softmax(x)        
+        # x = torch.cat((x_hidden_gae, x_nn),1)        
+        # x = self.FC_sum2(x)
+        # x = F.log_softmax(x)        
 
-        return x_decode_gae, x_hidden_gae, x, x_reAdj
+        # generate individual modal prediction
+        gae_pred = self.nn_im1(x_hidden_gae)
+        gae_pred = F.log_softmax(self.nn_im2(gae_pred))
 
+        fc_pred = self.nn_im1(x_nn)
+        fc_pred = F.log_softmax(self.nn_im2(fc_pred))
 
-    def loss(self, y1, y_target1, y2, y_target2,l2_regularization):
+        return x_decode_gae, x_hidden_gae, x, x_nn, gae_pred, fc_pred
+
+    def calc_label_sim(label_1, label_2):
+        Sim = label_1.float().mm(label_2.float().t())
+        return Sim
+
+    def calc_loss(view1_feature, view2_feature, view1_predict, view2_predict, labels_1, labels_2, alpha, beta):
+        term1 = ((view1_predict-labels_1.float())**2).sum(1).sqrt().mean() + ((view2_predict-labels_2.float())**2).sum(1).sqrt().mean()
+
+        cos = lambda x, y: x.mm(y.t()) / ((x ** 2).sum(1, keepdim=True).sqrt().mm((y ** 2).sum(1, keepdim=True).sqrt().t())).clamp(min=1e-6) / 2.
+        theta11 = cos(view1_feature, view1_feature)
+        theta12 = cos(view1_feature, view2_feature)
+        theta22 = cos(view2_feature, view2_feature)
+        Sim11 = calc_label_sim(labels_1, labels_1).float()
+        Sim12 = calc_label_sim(labels_1, labels_2).float()
+        Sim22 = calc_label_sim(labels_2, labels_2).float()
+        term21 = ((1+torch.exp(theta11)).log() - Sim11 * theta11).mean()
+        term22 = ((1+torch.exp(theta12)).log() - Sim12 * theta12).mean()
+        term23 = ((1 + torch.exp(theta22)).log() - Sim22 * theta22).mean()
+        term2 = term21 + term22 + term23
+
+        term3 = ((view1_feature - view2_feature)**2).sum(1).sqrt().mean()
+
+        im_loss = term1 + alpha * term2 + beta * term3
+        return im_loss
+
+    def loss(self, y1, y_target1, y2, y_target2, l2_regularization, view1_feature, view2_feature, view1_pred, view2_pred):
         y_target1 = y_target1.view(y_target1.size()[0], -1)
         
         # print(y1.shape, y_target1.shape)
@@ -299,6 +330,12 @@ class Graph_GCN(nn.Module):
         loss2 = nn.CrossEntropyLoss()(y2, y_target2)           
         loss = 1 * loss1 + 1 * loss2 
         
+        alpha = 1e-3
+        beta = 1e-1
+
+        im_loss = calc_loss(view1_feature, view2_feature, view1_pred, view2_pred, y_target2, y_target2, alpha, beta)
+        loss += im_loss
+
         l2_loss = 0.0
         for param in self.parameters():
             data = param* param
@@ -306,6 +343,7 @@ class Graph_GCN(nn.Module):
 
 
         loss += 0.2* l2_regularization* l2_loss
+        # loss += l2_regularization* l2_loss
 
         return loss
 
