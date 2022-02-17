@@ -132,7 +132,11 @@ class Graph_GCN(nn.Module):
         self.FC_concat = nn.Linear(Fin, self.out_dim)             
         #FC_sum2 with NN
         Fin = FC1_F + NN_FC2; Fout = self.out_dim;
-        self.FC_sum2 = nn.Linear(Fin, Fout)                  
+        FC_sum_medium = Fin // 2
+        self.FC_sum2 = nn.Linear(Fin, Fout)
+        # self.FC_sum2 = nn.Linear(Fin, FC_sum_medium)
+        # FC_sum2_2 with NN
+        # self.FC_sum2_2 = nn.Linear(FC_sum_medium, Fout)
         #FC_sum1 with CNN
         Fin = FC1_F + FC1_F; Fout = self.out_dim;
         self.FC_sum1 = nn.Linear(Fin, Fout)             
@@ -286,6 +290,7 @@ class Graph_GCN(nn.Module):
 
         x = torch.cat((x_hidden_gae, x_nn),1)        
         x = self.FC_sum2(x)
+        # x = self.FC_sum2_2(x)
         x = F.log_softmax(x)        
 
         return x_decode_gae, x_hidden_gae, x, x_reAdj
@@ -297,7 +302,7 @@ class Graph_GCN(nn.Module):
         # print(y1.shape, y_target1.shape)
         loss1 = nn.MSELoss()(y1, y_target1)
         loss2 = nn.CrossEntropyLoss()(y2, y_target2)           
-        loss = 1 * loss1 + 1 * loss2 
+        loss = 0.1 * loss1 + 1 * loss2 
         
         l2_loss = 0.0
         for param in self.parameters():
@@ -305,7 +310,7 @@ class Graph_GCN(nn.Module):
             l2_loss += data.sum()
 
 
-        loss += 0.2* l2_regularization* l2_loss
+        loss += l2_regularization* l2_loss
 
         return loss
 
