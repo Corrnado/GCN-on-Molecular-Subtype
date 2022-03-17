@@ -66,9 +66,13 @@ parser.add_argument('--num_omic', type=int, default = 1, help='# of omics')
 parser.add_argument('--epochs', type=int, default = 30, help='# of epoch')
 parser.add_argument('--batchsize', type=int, default = 64, help='# of genes')
 parser.add_argument('--database', type=str, default='biogrid', choices=['biogrid', 'string', 'coexpression'],help="netWork")
+parser.add_argument('--use_mirna', type=bool, default=True, help="if use mirna influence")
+parser.add_argument('--mirna_database', type=str, default='biogrid', choices=['biogrid', 'string'], help="which network for mirna to use")
+parser.add_argument('--threshold', type=str, default='0', choices=['0', '0.6', '0.65', '0.7', '0.75', '0.8'], help="which mirna influence")
+parser.add_argument('--shuffle_index', type=int, default = 0, help='which shuffle index to use')
 parser.add_argument('--singleton', type=bool, default=True, help="include Singleton")
 parser.add_argument('--savemodel', type=int, default = 0, help='if save the model')
-parser.add_argument('--loaddata', type=bool, default=True, help="if load the org data")
+# parser.add_argument('--loaddata', type=bool, default=True, help="if load the org data")
 
 args = parser.parse_args()
 
@@ -83,8 +87,34 @@ print('load data...')
 
 expression_data_path = 'data/common_expression_data.tsv'
 cnv_data_path = 'data/common_cnv_data.tsv'
+if args.mirna_database == 'biogrid':
+    if args.threshold == '0':
+        mirna_influence_data_path = 'data/influence_of_mirna_mfed.csv'
+    elif args.threshold == '0.6':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_six_mfed.csv'
+    elif args.threshold == '0.65':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_sixfive_mfed.csv'
+    elif args.threshold == '0.7':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_seven_mfed.csv'
+    elif args.threshold == '0.75':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_sevenfive_mfed.csv'
+    elif args.threshold == '0.85':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_eight_mfed.csv'
+else:
+    if args.threshold == '0':
+        mirna_influence_data_path = 'data/influence_of_mirna_string_mfed.csv'
+    elif args.threshold == '0.6':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_six_string_mfed.csv'
+    elif args.threshold == '0.65':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_sixfive_string_mfed.csv'
+    elif args.threshold == '0.7':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_seven_string_mfed.csv'
+    elif args.threshold == '0.75':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_sevenfive_string_mfed.csv'
+    elif args.threshold == '0.85':
+        mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_eight_string_mfed.csv'
 expression_variance_file = 'data/expression_variance.tsv'
-shuffle_index_path = 'data/common_shuffle_index.tsv'
+shuffle_index_path = 'data/common_shuffle_index_' + str(args.shuffle_index) + '.tsv'
 if args.database == 'biogrid':
     adjacency_matrix_file = 'data/adj_matrix_biogrid.npz'
     non_null_index_path = 'data/biogrid_non_null.csv'
@@ -95,9 +125,23 @@ elif args.database == 'coexpression':
     adjacency_matrix_file = 'data/adj_matrix_coexpression_filtered.npz'
     non_null_index_path = 'data/coexpression_non_null.csv'
 
-if args.loaddata:
+if args.use_mirna:
     if args.num_omic == 1:
-        expr_all_data = load_singleomic_data(expression_data_path)
+        mirna_inflence_data = utilsdata.load_mirna_data(mirna_influence_data_path = mirna_influence_data_path)
+    elif args.num_omic == 2:
+        expr_all_data, mirna_influence_all_data = utilsdata.load_exp_and_mirna_data(expression_data_path, mirna_influence_data_path)
+
+        adj, train_data_all, labels, shuffle_index = utilsdata.down_sampling_exp_and_mirna_data(expression_variance_path=expression_variance_file,
+                                                                        expression_data=expr_all_data,
+                                                                        mirna_influence_data=mirna_influence_all_data,
+                                                                        non_null_index_path=non_null_index_path,
+                                                                        shuffle_index_path=shuffle_index_path,
+                                                                        adjacency_matrix_path=adjacency_matrix_file,
+                                                                        number_gene=args.num_gene,
+                                                                        singleton=False)
+else:
+    if args.num_omic == 1:
+        expr_all_data = utilsdata.load_exp_data(expression_data_path)
 
         adj, train_data_all, labels, shuffle_index = utilsdata.downSampling_singleomics_data(expression_variance_path=expression_variance_file,
                                                                             expression_data=expr_all_data,
@@ -107,16 +151,16 @@ if args.loaddata:
                                                                             number_gene=args.num_gene,
                                                                             singleton=args.singleton)
     elif args.num_omic == 2:
-        expr_all_data, cnv_all_data = load_multiomics_data(expression_data_path, cnv_data_path)
+        expr_all_data, cnv_all_data = utilsdata.load_exp_and_cnv_data(expression_data_path, cnv_data_path)
 
         adj, train_data_all, labels, shuffle_index = utilsdata.downSampling_multiomics_data(expression_variance_path=expression_variance_file,
-                                                                      expression_data=expr_all_data,
-                                                                      cnv_data=cnv_all_data,
-                                                                      non_null_index_path=non_null_index_path,
-                                                                      shuffle_index_path=shuffle_index_path,
-                                                                      adjacency_matrix_path=adjacency_matrix_file,
-                                                                      number_gene=args.num_gene,
-                                                                      singleton=False)
+                                                                        expression_data=expr_all_data,
+                                                                        cnv_data=cnv_all_data,
+                                                                        non_null_index_path=non_null_index_path,
+                                                                        shuffle_index_path=shuffle_index_path,
+                                                                        adjacency_matrix_path=adjacency_matrix_file,
+                                                                        number_gene=args.num_gene,
+                                                                        singleton=False)
 
 from sklearn import preprocessing
 le = preprocessing.LabelEncoder()

@@ -63,15 +63,25 @@ def high_variance_expression_gene(expression_variance_path, non_null_path, num_g
         gene_list_index = gene_variance.nlargest(num_gene, 'variance').index
     return gene_list, gene_list_index
 
-def load_singleomic_data(expression_data_path):
+def load_exp_data(expression_data_path):
     expression_data = pd.read_csv(expression_data_path, sep='\t', index_col=0, header=0)
     return expression_data
 
-def load_multiomics_data(expression_data_path, cnv_data_path):
+def load_mirna_data(mirna_influence_data_path):
+    mirna_influence_data = pd.read_csv(mirna_influence_data_path, index_col=None, header=None)
+    return mirna_influence_data
+
+def load_exp_and_cnv_data(expression_data_path, cnv_data_path):
     ## load multi-omics data
     expression_data = pd.read_csv(expression_data_path, sep='\t', index_col=0, header=0)
     cnv_data = pd.read_csv(cnv_data_path, sep='\t', index_col=0, header=0)
     return expression_data, cnv_data
+
+def load_exp_and_mirna_data(expression_data_path, mirna_influence_data_path):
+    ## load multi-omics data
+    expression_data = pd.read_csv(expression_data_path, sep='\t', index_col=0, header=0)
+    mirna_influence_data = pd.read_csv(mirna_influence_data_path, index_col=None, header=None)
+    return expression_data, mirna_influence_data
 
 def downSampling_singleomics_data(expression_variance_path, expression_data, non_null_index_path, shuffle_index_path, adjacency_matrix_path, number_gene, singleton=False):
     ## obtain high varaince gene list
@@ -144,6 +154,42 @@ def downSampling_multiomics_data(expression_variance_path, expression_data, cnv_
     
     return adj_selected, np.asarray(data), labels.to_numpy(), shuffle_index.to_numpy()
 
+
+def down_sampling_exp_and_mirna_data(expression_variance_path, expression_data, mirna_influence_data, non_null_index_path, shuffle_index_path, adjacency_matrix_path, number_gene, singleton=False):
+    ## obtain high varaince gene list
+    high_variance_gene_list, high_variance_gene_index = high_variance_expression_gene(expression_variance_path, non_null_index_path, number_gene, singleton)
+
+    ## get labels before filtering columns
+    labels = expression_data['icluster_cluster_assignment']
+    labels = labels - 1
+    
+    ## filter multi-omics data by gene list
+    expression_data = expression_data.loc[:,high_variance_gene_list]
+    mirna_influence_data = mirna_influence_data.iloc[:, high_variance_gene_index]
+    num_samples = mirna_influence_data.shape[0]
+    ## concatenate expr and mirna
+    data= np.asarray(mirna_influence_data).reshape(num_samples, -1 ,1)
+    data = np.concatenate([data, np.asarray(expression_data).reshape(num_samples, -1, 1) ], axis = 2)
+
+    ## load adjacency matrix
+    adj = sp.load_npz(adjacency_matrix_path)
+    adj_mat = adj.todense()
+    adj_mat_selected = adj_mat[high_variance_gene_index,:]
+    adj_mat_selected = adj_mat_selected[:,high_variance_gene_index]
+    print(adj_mat_selected.shape)
+
+    ## convert the dense matrix back to sparse matrix
+    adj_selected = sp.csr_matrix(adj_mat_selected)
+
+    if singleton:
+        print('including singleton')
+        adj_selected = adj_selected + sp.eye(adj_selected.shape[0])
+
+    # del features['iCluster']
+    shuffle_index = pd.read_csv(shuffle_index_path, sep='\t', index_col=0, header=0)
+    # print(shuffle_index.shape)
+    
+    return adj_selected, np.asarray(data), labels.to_numpy(), shuffle_index.to_numpy()
 
        
         
