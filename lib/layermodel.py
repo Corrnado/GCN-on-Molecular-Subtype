@@ -285,9 +285,9 @@ class Graph_GCN(nn.Module):
 
         # concatenate layer 
 
-        # x = torch.cat((x_hidden_gae, x_nn),1)        
-        # x = self.FC_sum2(x)
-        # x = F.log_softmax(x)        
+        x = torch.cat((x_hidden_gae, x_nn),1)        
+        x = self.FC_sum2(x)
+        x = F.log_softmax(x)        
 
         # generate individual modal prediction
         gae_pred = self.nn_im1(x_hidden_gae)
@@ -298,20 +298,24 @@ class Graph_GCN(nn.Module):
 
         return x_decode_gae, x_hidden_gae, x, x_nn, gae_pred, fc_pred
 
-    def calc_label_sim(label_1, label_2):
+    def calc_label_sim(self, label_1, label_2):
+        label_1 = torch.from_numpy(label_1)
+        label_2 = torch.from_numpy(label_2)
         Sim = label_1.float().mm(label_2.float().t())
         return Sim
 
-    def calc_loss(view1_feature, view2_feature, view1_predict, view2_predict, labels_1, labels_2, alpha, beta):
-        term1 = ((view1_predict-labels_1.float())**2).sum(1).sqrt().mean() + ((view2_predict-labels_2.float())**2).sum(1).sqrt().mean()
+    def calc_loss(self, view1_feature, view2_feature, view1_predict, view2_predict, labels_1, labels_2, alpha, beta):
+        # term1 = ((view1_predict-labels_1.float())**2).sum(1).sqrt().mean() + ((view2_predict-labels_2.float())**2).sum(1).sqrt().mean()
+        term1 = nn.CrossEntropyLoss()(view1_predict, labels_1) + nn.CrossEntropyLoss()(view2_predict, labels_1)
 
         cos = lambda x, y: x.mm(y.t()) / ((x ** 2).sum(1, keepdim=True).sqrt().mm((y ** 2).sum(1, keepdim=True).sqrt().t())).clamp(min=1e-6) / 2.
         theta11 = cos(view1_feature, view1_feature)
         theta12 = cos(view1_feature, view2_feature)
         theta22 = cos(view2_feature, view2_feature)
-        Sim11 = calc_label_sim(labels_1, labels_1).float()
-        Sim12 = calc_label_sim(labels_1, labels_2).float()
-        Sim22 = calc_label_sim(labels_2, labels_2).float()
+        # Sim11 = self.calc_label_sim(labels_1, labels_1).float()
+        # Sim12 = self.calc_label_sim(labels_1, labels_2).float()
+        # Sim22 = self.calc_label_sim(labels_2, labels_2).float()
+        Sim11 = Sim12 = Sim22 = self.calc_label_sim(labels_2, labels_2).float()
         term21 = ((1+torch.exp(theta11)).log() - Sim11 * theta11).mean()
         term22 = ((1+torch.exp(theta12)).log() - Sim12 * theta12).mean()
         term23 = ((1 + torch.exp(theta22)).log() - Sim22 * theta22).mean()
@@ -321,6 +325,13 @@ class Graph_GCN(nn.Module):
 
         im_loss = term1 + alpha * term2 + beta * term3
         return im_loss
+    
+    def convert_label_back_to_vector_space(self, labels, nclass):
+        label_space = np.zeros((len(labels), nclass))
+
+        for ind, value in enumerate(list(labels)):
+            label_space[ind, value] = 1
+        return label_space
 
     def loss(self, y1, y_target1, y2, y_target2, l2_regularization, view1_feature, view2_feature, view1_pred, view2_pred):
         y_target1 = y_target1.view(y_target1.size()[0], -1)
@@ -332,9 +343,10 @@ class Graph_GCN(nn.Module):
         
         alpha = 1e-3
         beta = 1e-1
+        label_space = self.convert_label_back_to_vector_space(y_target2, 27)
 
-        im_loss = calc_loss(view1_feature, view2_feature, view1_pred, view2_pred, y_target2, y_target2, alpha, beta)
-        loss += im_loss
+        im_loss = self.calc_loss(view1_feature, view2_feature, view1_pred, view2_pred, y_target2, label_space, alpha, beta)
+        loss += 0.1 * im_loss
 
         l2_loss = 0.0
         for param in self.parameters():

@@ -339,11 +339,15 @@ def test_model(loader,num_classes):
     for batch_x, batch_y in loader:
         batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
-        out_gae, out_hidden, pred, out_adj = net(batch_x, dropout_value, L)
+        out_gae, out_hidden, pred, out_nn, graph_pred, fc_pred  = net(batch_x, dropout_value, L)
         
         test_acc += utilsdata.accuracy(pred, batch_y).item()
         count += 1
         y_true.append(batch_y.item())
+        graph_accu = utilsdata.accuracy(graph_pred, batch_y).item()
+        fc_accu = utilsdata.accuracy(fc_pred, batch_y).item()
+        print('Individual Modal Accuracy:')
+        print(graph_accu, fc_accu)
         #y_pred.append(pred.max(1)[1].item())
         confusionGCN[batch_y.item(), pred.max(1)[1].item()] += 1
         px = pd.DataFrame(pred.detach().cpu().numpy())            
