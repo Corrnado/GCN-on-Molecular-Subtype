@@ -68,7 +68,7 @@ def load_exp_data(expression_data_path):
     return expression_data
 
 def load_mirna_data(mirna_influence_data_path):
-    mirna_influence_data = pd.read_csv(mirna_influence_data_path, index_col=None, header=None)
+    mirna_influence_data = pd.read_csv(mirna_influence_data_path, sep=' ', index_col=None, header=None)
     return mirna_influence_data
 
 def load_exp_and_cnv_data(expression_data_path, cnv_data_path):
@@ -80,7 +80,7 @@ def load_exp_and_cnv_data(expression_data_path, cnv_data_path):
 def load_exp_and_mirna_data(expression_data_path, mirna_influence_data_path):
     ## load multi-omics data
     expression_data = pd.read_csv(expression_data_path, sep='\t', index_col=0, header=0)
-    mirna_influence_data = pd.read_csv(mirna_influence_data_path, index_col=None, header=None)
+    mirna_influence_data = pd.read_csv(mirna_influence_data_path, sep=' ', index_col=None, header=None)
     return expression_data, mirna_influence_data
 
 def downSampling_singleomics_data(expression_variance_path, expression_data, non_null_index_path, shuffle_index_path, adjacency_matrix_path, number_gene, singleton=False):
@@ -163,9 +163,12 @@ def down_sampling_exp_and_mirna_data(expression_variance_path, expression_data, 
     labels = expression_data['icluster_cluster_assignment']
     labels = labels - 1
     
+    print(mirna_influence_data.shape)
     ## filter multi-omics data by gene list
     expression_data = expression_data.loc[:,high_variance_gene_list]
     mirna_influence_data = mirna_influence_data.iloc[:, high_variance_gene_index]
+    # print(mirna_influence_data.shape)
+    # print(expression_data.shape)
     num_samples = mirna_influence_data.shape[0]
     ## concatenate expr and mirna
     data= np.asarray(mirna_influence_data).reshape(num_samples, -1 ,1)

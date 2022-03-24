@@ -85,8 +85,8 @@ generateTrainTest = 1
     
 print('load data...')
 
-expression_data_path = 'data/common_expression_data.tsv'
-cnv_data_path = 'data/common_cnv_data.tsv'
+expression_data_path = 'data/standardized_expression_data_with_labels.tsv'
+cnv_data_path = 'data/standardized_cnv_data_with_labels.tsv'
 if args.mirna_database == 'biogrid':
     if args.threshold == '0':
         mirna_influence_data_path = 'data/influence_of_mirna_mfed.csv'
@@ -98,7 +98,7 @@ if args.mirna_database == 'biogrid':
         mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_seven_mfed.csv'
     elif args.threshold == '0.75':
         mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_sevenfive_mfed.csv'
-    elif args.threshold == '0.85':
+    elif args.threshold == '0.8':
         mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_eight_mfed.csv'
 else:
     if args.threshold == '0':
@@ -111,10 +111,10 @@ else:
         mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_seven_string_mfed.csv'
     elif args.threshold == '0.75':
         mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_sevenfive_string_mfed.csv'
-    elif args.threshold == '0.85':
+    elif args.threshold == '0.8':
         mirna_influence_data_path = 'data/influence_of_mirna_filtered_at_eight_string_mfed.csv'
 expression_variance_file = 'data/expression_variance.tsv'
-shuffle_index_path = 'data/common_shuffle_index_' + str(args.shuffle_index) + '.tsv'
+shuffle_index_path = 'data/common_trimmed_shuffle_index_' + str(args.shuffle_index) + '.tsv'
 if args.database == 'biogrid':
     adjacency_matrix_file = 'data/adj_matrix_biogrid.npz'
     non_null_index_path = 'data/biogrid_non_null.csv'
@@ -225,7 +225,7 @@ except NameError:
 
 
 # network parameters
-F_0 = args.num_of_omics
+F_0 = args.num_omic
 D_g = train_data.shape[1] # features(genes)
 CL1_F = 5
 CL1_K = 5
